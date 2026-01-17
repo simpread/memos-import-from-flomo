@@ -4,7 +4,7 @@ var TurndownService = require("turndown");
 const chalk = require("chalk");
 
 const { htmlPath, getFilePath, mergePromise, errorTip } = require("./utils/utils");
-const { uploadFile, sendMemo, updateMemo, setMemoResources } = require("./utils/api");
+const { uploadAttachment, sendMemo, updateMemo } = require("./utils/api");
 
 fs.removeSync("./memo.json");
 fs.removeSync("./sendedIds.json");
@@ -59,29 +59,6 @@ memoArr.sort((a, b) => {
   return new Date(b.time) - new Date(a.time);
 });
 
-async function uploadFileHandler() {
-  console.log(chalk.green("======================= 上传资源 ======================="));
-  for (const memo of memoArr) {
-    memoArr.resourceList = memoArr.resourceList || [];
-    const uploadFilePromiseArr = [];
-    if (memo.files.length) {
-      for (const filePath of memo.files) {
-        const fullPath = getFilePath(filePath);
-        uploadFilePromiseArr.push(() => {
-          console.log(chalk.green("开始上传"), filePath);
-          return uploadFile(fullPath);
-        });
-      }
-    }
-
-    await mergePromise(uploadFilePromiseArr).then((res) => {
-      memo.resources = [...(memo.resources || []), ...res];
-    });
-  }
-
-  console.log(chalk.green("======================= 上传资源 end ======================="));
-}
-
 async function sendMemoHandler() {
   const sendMemoPromiseArr = [];
 
@@ -108,11 +85,25 @@ async function sendMemoHandler() {
           content: memo.content,
           // createdTs: new Date(memo.time).getTime() / 1000,
         }).then(async (res) => {
-          sendedMemoNames.push(res?.data?.name || res?.data?.data?.name);
+          const memoName = res?.data?.name || res?.data?.data?.name;
+          sendedMemoNames.push(memoName);
 
-          await updateMemo(res?.data?.name, new Date(memo.time).toISOString());
+          await updateMemo(memoName, new Date(memo.time).toISOString());
 
-          await setMemoResources(res?.data?.name, memo.resources);
+          const uploadAttachmentPromiseArr = [];
+          if (memo.files.length) {
+            for (const filePath of memo.files) {
+              const fullPath = getFilePath(filePath);
+              uploadAttachmentPromiseArr.push(() => {
+                console.log(chalk.green("开始上传附件"), filePath);
+                return uploadAttachment(fullPath, memoName);
+              });
+            }
+          }
+
+          if (uploadAttachmentPromiseArr.length) {
+            await mergePromise(uploadAttachmentPromiseArr);
+          }
 
           console.log(chalk.green(`发送成功 [${currentCount}/${totalCount}]`));
 
@@ -129,4 +120,4 @@ async function sendMemoHandler() {
   console.log(chalk.green("======================= 发送 Memo 完成 ======================="));
 }
 
-uploadFileHandler().then(sendMemoHandler);
+sendMemoHandler();
