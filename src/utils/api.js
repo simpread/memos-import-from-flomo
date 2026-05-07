@@ -15,16 +15,17 @@ const getVersion = () => {
   return "/v1";
 };
 
-exports.uploadFile = async (filePath) => {
+exports.uploadAttachment = async (filePath, memoName) => {
   const readFile = fs.readFileSync(filePath);
 
   return axios({
     method: "post",
-    url: getRequestUrl(`/api${getVersion()}/resources`),
+    url: getRequestUrl(`/api${getVersion()}/attachments`),
     data: {
       content: readFile.toString("base64"),
       filename: path.basename(filePath),
       type: mime.getType(filePath) || undefined,
+      memo: memoName,
     },
     headers: default_header,
   }).then((res) => res.data);
